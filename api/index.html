@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Credit Scorecard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #0a0a0b;
+    --surface:   #111114;
+    --border:    #1e1e24;
+    --amber:     #f5a623;
+    --amber-dim: #a06c12;
+    --green:     #2ecc71;
+    --red:       #e74c3c;
+    --yellow:    #f39c12;
+    --muted:     #4a4a5a;
+    --text:      #d4d4d8;
+    --text-dim:  #71717a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 80px;
+  }
+
+  /* Subtle grid texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(245,166,35,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,166,35,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; width: 100%; max-width: 860px; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: baseline; gap: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px; margin-bottom: 40px;
+  }
+  header h1 {
+    font-size: 13px; font-weight: 500; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--amber);
+  }
+  header span {
+    font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.4; }
+  }
+
+  /* ── Input panel ── */
+  .input-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px 32px;
+    margin-bottom: 32px;
+  }
+
+  .field-label {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 10px; display: block;
+  }
+
+  .row { display: flex; gap: 12px; align-items: flex-end; }
+
+  select, input[type="text"] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+    flex: 1;
+  }
+  select:focus, input[type="text"]:focus {
+    border-color: var(--amber);
+  }
+  select option { background: var(--surface); }
+
+  button {
+    background: var(--amber);
+    color: #000;
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 11px 28px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+  button:hover  { background: #ffc04a; }
+  button:active { transform: scale(0.97); }
+  button:disabled { background: var(--muted); color: var(--text-dim); cursor: not-allowed; }
+
+  /* ── Result card ── */
+  #result { display: none; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px 32px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 20px;
+    padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+
+  /* Score hero */
+  .score-hero {
+    display: flex; align-items: center; gap: 40px; margin-bottom: 28px;
+  }
+  .score-num {
+    font-size: 72px; font-weight: 600; line-height: 1;
+    color: var(--amber); letter-spacing: -2px;
+  }
+  .score-meta { display: flex; flex-direction: column; gap: 8px; }
+  .band-badge {
+    display: inline-block;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 4px 12px;
+    border: 1px solid currentColor;
+  }
+  .band-Excellent { color: var(--green);  border-color: var(--green); }
+  .band-Good      { color: #27ae60;       border-color: #27ae60; }
+  .band-Fair      { color: var(--yellow); border-color: var(--yellow); }
+  .band-Poor      { color: var(--red);    border-color: var(--red); }
+
+  .user-tag {
+    font-size: 11px; color: var(--text-dim);
+  }
+
+  /* Score bar */
+  .score-bar-wrap {
+    margin-bottom: 28px;
+  }
+  .score-bar-track {
+    height: 4px; background: var(--border); position: relative;
+    margin-bottom: 8px;
+  }
+  .score-bar-fill {
+    height: 100%; background: var(--amber);
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px var(--amber-dim);
+  }
+  .score-bar-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); letter-spacing: 0.05em;
+  }
+
+  /* Probabilities */
+  .prob-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin-bottom: 4px;
+  }
+  .prob-cell {
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+  .prob-label {
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+  .prob-val { font-size: 22px; font-weight: 500; }
+  .prob-val.poor     { color: var(--red); }
+  .prob-val.standard { color: var(--yellow); }
+  .prob-val.good     { color: var(--green); }
+
+  /* SHAP factors */
+  .factors-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .factor-list { list-style: none; }
+  .factor-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .factor-list li:last-child { border-bottom: none; }
+  .factor-name { color: var(--text); flex: 1; margin-right: 12px; }
+  .factor-val  { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .factor-val.pos { color: var(--green); }
+  .factor-val.neg { color: var(--red); }
+
+  .section-sub {
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 14px;
+  }
+
+  /* Error */
+  #error {
+    display: none;
+    background: rgba(231,76,60,0.08);
+    border: 1px solid rgba(231,76,60,0.3);
+    color: var(--red);
+    padding: 14px 18px;
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* Loader */
+  #loader {
+    display: none; text-align: center;
+    padding: 40px; color: var(--text-dim); font-size: 12px;
+    letter-spacing: 0.1em;
+  }
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border);
+    border-top-color: var(--amber); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block; margin-right: 12px; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 8px 0 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Credit Scorecard</h1>
+    <span>LSTM · SHAP · Calibrated</span>
+    <div class="status-dot" id="statusDot" title="API online"></div>
+  </header>
+
+  <div class="input-panel">
+    <label class="field-label">Select test user</label>
+    <div class="row">
+      <select id="userSelect">
+        <option value="">— loading users —</option>
+      </select>
+      <button id="scoreBtn" onclick="runScore()" disabled>Run Score</button>
+    </div>
+  </div>
+
+  <div id="error"></div>
+  <div id="loader"><span class="spinner"></span>Scoring user…</div>
+
+  <div id="result">
+    <!-- Score hero -->
+    <div class="card">
+      <div class="card-title">Risk Assessment</div>
+      <div class="score-hero">
+        <div class="score-num" id="scoreNum">—</div>
+        <div class="score-meta">
+          <span class="band-badge" id="bandBadge">—</span>
+          <span class="user-tag" id="userTag">—</span>
+        </div>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-track">
+          <div class="score-bar-fill" id="scoreBar" style="width:0%"></div>
+        </div>
+        <div class="score-bar-labels"><span>300 · Poor</span><span>438 · Fair</span><span>575 · Good</span><span>713+ · Excellent</span></div>
+      </div>
+    </div>
+
+    <!-- Probabilities -->
+    <div class="card">
+      <div class="card-title">Calibrated Class Probabilities</div>
+      <div class="prob-grid">
+        <div class="prob-cell">
+          <div class="prob-label">Poor</div>
+          <div class="prob-val poor" id="probPoor">—</div>
+        </div>
+        <div class="prob-cell">
+          <div class="prob-label">Standard</div>
+          <div class="prob-val standard" id="probStandard">—</div>
+        </div>
+        <div class="prob-cell">
+          <div class="prob-label">Good</div>
+          <div class="prob-val good" id="probGood">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHAP factors -->
+    <div class="card">
+      <div class="card-title">SHAP Feature Contributions  <span style="color:var(--text-dim);font-size:10px">— score point impact per feature</span></div>
+      <div class="factors-grid">
+        <div>
+          <div class="section-sub">↑ Top positive drivers</div>
+          <ul class="factor-list" id="posFactors"></ul>
+        </div>
+        <div>
+          <div class="section-sub">↓ Top negative drivers</div>
+          <ul class="factor-list" id="negFactors"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = '';   // same origin
+
+  // Load users on page load
+  async function loadUsers() {
+    try {
+      const r = await fetch(`${API}/users`);
+      const d = await r.json();
+      const sel = document.getElementById('userSelect');
+      sel.innerHTML = '<option value="">— select a user —</option>';
+      window._userMap = {};
+      d.users.forEach(u => {
+        window._userMap[u.user_id] = u.features;
+        const opt = document.createElement('option');
+        opt.value = u.user_id;
+        opt.textContent = u.user_id;
+        sel.appendChild(opt);
+      });
+      document.getElementById('scoreBtn').disabled = false;
+    } catch(e) {
+      showError('Could not load users from /users endpoint.');
+    }
+  }
+
+  async function runScore() {
+    const userId = document.getElementById('userSelect').value;
+    if (!userId) return showError('Please select a user.');
+
+    hide('error'); hide('result');
+    show('loader');
+    document.getElementById('scoreBtn').disabled = true;
+
+    try {
+      const resp = await fetch(`${API}/score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, features: window._userMap[userId] })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || resp.statusText);
+      }
+      const d = await resp.json();
+      renderResult(d);
+    } catch(e) {
+      showError(e.message);
+    } finally {
+      hide('loader');
+      document.getElementById('scoreBtn').disabled = false;
+    }
+  }
+
+  function renderResult(d) {
+    // Score + band
+    document.getElementById('scoreNum').textContent = d.risk_score;
+    document.getElementById('userTag').textContent  = `User: ${d.user_id}`;
+
+    const badge = document.getElementById('bandBadge');
+    badge.textContent = d.risk_band;
+    badge.className = `band-badge band-${d.risk_band}`;
+
+    // Score bar  (300–850 range)
+    const pct = ((d.risk_score - 300) / 550) * 100;
+    document.getElementById('scoreBar').style.width = `${Math.min(100, Math.max(0, pct))}%`;
+
+    // Probabilities
+    document.getElementById('probPoor').textContent     = (d.probabilities.Poor     * 100).toFixed(1) + '%';
+    document.getElementById('probStandard').textContent = (d.probabilities.Standard * 100).toFixed(1) + '%';
+    document.getElementById('probGood').textContent     = (d.probabilities.Good     * 100).toFixed(1) + '%';
+
+    // SHAP factors
+    function factorItem(f, cls) {
+      return `<li>
+        <span class="factor-name">${f.feature}</span>
+        <span class="factor-val ${cls}">${f.score_points > 0 ? '+' : ''}${f.score_points.toFixed(1)} pts</span>
+      </li>`;
+    }
+    document.getElementById('posFactors').innerHTML =
+      d.top_positive_factors.map(f => factorItem(f, 'pos')).join('');
+    document.getElementById('negFactors').innerHTML =
+      d.top_negative_factors.map(f => factorItem(f, 'neg')).join('');
+
+    show('result');
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error');
+    el.textContent = `ERROR: ${msg}`;
+    show('error'); hide('result'); hide('loader');
+  }
+
+  function show(id) { document.getElementById(id).style.display = 'block'; }
+  function hide(id) { document.getElementById(id).style.display = 'none';  }
+
+  // Check API health
+  fetch('/health').then(r => {
+    if (!r.ok) document.getElementById('statusDot').style.background = 'var(--red)';
+  }).catch(() => {
+    document.getElementById('statusDot').style.background = 'var(--red)';
+  });
+
+  loadUsers();
+</script>
+</body>
+</html>
