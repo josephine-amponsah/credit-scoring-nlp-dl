@@ -57,6 +57,71 @@ calibrated_probs = softmax(logits / T)
 
 ---
 
+## Model comparison
+
+Four models were trained and evaluated on the same held-out test set (n = 3,125): two LightGBM variants (with and without class-balancing via sampling), XGBoost, and the LSTM. AUC was the primary training objective, but the final model selection was made on per-class recall — because in credit scoring the cost of a wrong prediction is not the same across classes.
+
+### Why AUC alone is the wrong selection criterion
+
+AUC measures how well a model ranks customers across the full probability threshold range. It does not tell you what happens at the operating threshold your business actually uses, and it aggregates performance across all three classes with equal weight. In credit scoring, two classes carry disproportionate consequences:
+
+- **Poor** (class 0) is the most risky cohort. A Poor customer classified as Standard or Good is a potential bad debt. The cost is a write-off.
+- **Good** (class 2) is the most profitable cohort. A Good customer classified as Standard or Poor is a creditworthy customer you have either declined or under-served. The cost is lost revenue.
+
+Recall on these two classes maps most directly to business outcomes. A model with lower AUC but higher recall on both ends is the strictly preferable choice.
+
+### Results
+
+| Model | AUC | Poor recall | Standard recall | Good recall | Accuracy |
+|---|---|---|---|---|---|
+| LightGBM | 0.78 | 0.52 | 0.80 | 0.26 | 0.62 |
+| LightGBM + sampling | 0.78 | 0.55 | 0.77 | 0.34 | 0.62 |
+| XGBoost | 0.77 | 0.54 | 0.74 | 0.42 | 0.62 |
+| **LSTM** | **0.74** | **0.68** | 0.43 | **0.71** | 0.56 |
+
+The LSTM has the lowest AUC and overall accuracy of the four models. It is also clearly the best on the two metrics that matter: recall on the riskiest cohort (+14–16pp over tree models) and recall on the most profitable cohort (+29–45pp over tree models).
+
+### The tree model problem: defaulting to Standard
+
+The explanation for why the tree models look good on AUC while failing at the extremes is visible in their Standard recall. LightGBM hits 80% Standard recall — which sounds healthy until you realise it comes at the cost of almost entirely missing the Good class. Out of 603 Good customers in the test set:
+
+| Model | Good customers correctly identified | Good customers missed |
+|---|---|---|
+| LightGBM | 157 (26%) | **446 (74%)** |
+| LightGBM + sampling | 205 (34%) | **398 (66%)** |
+| XGBoost | 256 (42%) | **347 (58%)** |
+| **LSTM** | **431 (71%)** | 172 (29%) |
+
+Tree models achieve competitive AUC by concentrating their discriminative power in the large Standard class (n = 1,621), where the most training examples and therefore the most information gain lives. They effectively treat the minority Good class as noise. The same bias appears, more moderately, in the Poor class.
+
+### What the confusion matrices reveal
+
+**LightGBM:**
+```
+Predicted →   Poor   Standard   Good
+Actual Poor  [ 470      422        9 ]   ← 422 risky customers rated Standard
+Actual Std   [ 229     1302       90 ]
+Actual Good  [   7      439      157 ]   ← 439 profitable customers rated Standard
+```
+
+**LSTM:**
+```
+Predicted →   Poor   Standard   Good
+Actual Poor  [ 610      150      141 ]   ← 16% more Poor customers correctly flagged
+Actual Std   [ 491      696      434 ]
+Actual Good  [  35      137      431 ]   ← 274 more Good customers correctly served
+```
+
+The LSTM correctly flags **140 more Poor customers** and correctly serves **274 more Good customers** than LightGBM on the same test set. The tradeoff is that it misclassifies more Poor customers as Good (141 vs 9 for LightGBM) — but this is the direct consequence of a model that has learned to commit to the tails rather than hedge toward the majority class. The Poor customers that reach a Good prediction in the LSTM are genuinely ambiguous cases at the class boundary; the LightGBM's near-zero Poor→Good rate is a sign that it is not attempting to distinguish Good from the rest at all.
+
+### Why the LSTM handles the extremes better
+
+The LSTM was trained with **class-weighted cross-entropy loss**, which scales the penalty for misclassifying a Poor or Good customer by the inverse frequency of that class. The model is therefore explicitly optimised to reduce errors where the business cost is highest, not where the training examples are most abundant.
+
+The tree models were also trained with class weights in one variant, but the mechanism is different: gradient boosting builds trees greedily on residuals, and the majority-class residuals dominate early iterations in a way that class weighting cannot fully overcome without aggressive subsampling. The LSTM's end-to-end gradient optimisation propagates the class-weighted loss uniformly across all parameters — including the embedding layers for categorical features and the LSTM hidden state — which gives it a more complete view of the minority-class signal.
+
+---
+
 ## Explainability: SHAP on an LSTM
 
 ### The challenge
