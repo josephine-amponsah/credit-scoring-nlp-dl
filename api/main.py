@@ -102,29 +102,30 @@ explainer  = shap.GradientExplainer(wrapped, background)
 #
 # 275 = (850 − 300) / 2  — one unit of E[class] is worth 275 points.
 #
-SCORE_MIN   = 300
-SCORE_SCALE = 275   # one class step = 275 score points
-
+PDO        = 50
+BASE_SCORE = 600
+FACTOR     = PDO / np.log(2)      # ≈ 72.13
+EPSILON    = 1e-7                  # guard against ln(0)
+ 
 # SHAP class weights in score-point space:
-#   d(score)/d(P_class) = [0, 275, 550] for [Poor, Standard, Good]
-# So: sv_score[feature] = sv[feature,Poor]·0 + sv[feature,Std]·275 + sv[feature,Good]·550
-SHAP_SCORE_WEIGHTS = np.array([0.0, float(SCORE_SCALE), 2.0 * float(SCORE_SCALE)])
-
+#   d(score)/d(logit_k) = [-FACTOR, 0, +FACTOR] for [Poor, Standard, Good]
+#
+# Standard's weight is exactly 0 — any shift in its logit moves P(Good) and
+# P(Poor) proportionally, leaving their ratio (and the score) unchanged.
+SHAP_SCORE_WEIGHTS = np.array([-FACTOR, 0.0, FACTOR])
+ 
 def compute_risk_score(probs: np.ndarray) -> int:
     """probs: [p_poor, p_standard, p_good]"""
-    e_class = probs[1] * 1.0 + probs[2] * 2.0
-    return int(round(SCORE_MIN + SCORE_SCALE * e_class))
-
+    odds  = (probs[2] + EPSILON) / (probs[0] + EPSILON)
+    score = BASE_SCORE + FACTOR * np.log(odds)
+    return int(round(np.clip(score, 300, 850)))
+ 
 def score_to_band(s: int) -> str:
-    # Thresholds are anchored to the formula:
-    #   438 ≈ E[class]=0.5  (balanced Poor/Standard)
-    #   575 = E[class]=1.0  (pure Standard)
-    #   713 ≈ E[class]=1.5  (balanced Standard/Good)
-    if s >= 713: return "Excellent"
-    if s >= 575: return "Good"
-    if s >= 438: return "Fair"
-    return "Poor"
-
+    if s >= 650: return "Excellent"   # odds ≥ 2
+    if s >= 600: return "Good"        # 1 ≤ odds < 2
+    if s >= 550: return "Fair"        # 0.5 ≤ odds < 1
+    return "Poor"                     # odds < 0.5
+ 
 def shap_to_score_points(shap_arr: np.ndarray) -> np.ndarray:
     """
     shap_arr: (1, n_features, 3) from GradientExplainer
@@ -132,7 +133,7 @@ def shap_to_score_points(shap_arr: np.ndarray) -> np.ndarray:
     """
     # shap_arr[0] is (n_features, 3); dot with [0, 275, 550]
     return shap_arr[0] @ SHAP_SCORE_WEIGHTS
-
+ 
 def aggregate_loan_type(sv_score: np.ndarray) -> dict:
     """
     Collapses all loan_type__ TF-IDF columns into a single 'Loan_Type' entry.
@@ -148,13 +149,14 @@ def aggregate_loan_type(sv_score: np.ndarray) -> dict:
     if loan_type_cols:
         contribs["Loan_Type"] = loan_total
     return contribs
-
+ 
 def top_factors(contribs: dict, n: int = 7):
     """Split contributions into positive/negative, top-n by absolute value."""
     ranked = sorted(contribs.items(), key=lambda kv: abs(kv[1]), reverse=True)[:n]
     pos = [{"feature": k, "score_points": round(v, 1)} for k, v in ranked if v >= 0]
     neg = [{"feature": k, "score_points": round(v, 1)} for k, v in ranked if v <  0]
     return pos, neg
+
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 
