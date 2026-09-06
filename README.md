@@ -1,5 +1,7 @@
 # Credit Scorecard API
 
+Directory credit-risk-scorecard/
+
 **LSTM · SHAP · Temperature Calibration · FastAPI**
 
 A production-ready credit scoring system that combines a deep learning classifier with post-hoc explainability and calibrated probability outputs. Given a customer's financial profile, the API returns a risk score, a risk band, and a ranked breakdown of exactly which features drove that score — and by how many points.
