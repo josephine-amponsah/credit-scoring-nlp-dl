@@ -3,8 +3,8 @@ runtime: python39
 services:
 - environment_slug: python
   github:
-    branch: master
+    branch: main
     deploy_on_push: true
-    repo: credit-scoring-nlp-dl/dash_app
+    repo: credit-portfolio-risk-monitoring/app
   name: app
 entrypoint: gunicorn --worker-tmp-dir /dev/shm app.wsgi --timeout 120
