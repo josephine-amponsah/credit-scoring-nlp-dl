@@ -10,8 +10,7 @@ from pydantic.dataclasses import dataclass
 from fastapi import Query
 
 # local insights helpers (use package-relative import so uvicorn can import api.main)
-from .modules import insights
-from .modules import risk_metrics
+from .services import insights, risk_metrics
 
 app = FastAPI()
 
