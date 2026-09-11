@@ -116,10 +116,27 @@ def risk_var(period: Optional[str] = None, confidence: Optional[float] = 0.95, n
         if losses.size == 0:
             return {'var': 0.0, 'hist': {'bins': [], 'counts': []}}
         var = risk_metrics.var_from_simulations(losses, confidence=float(confidence))
-        # histogram
         import numpy as _np
         counts, bin_edges = _np.histogram(losses, bins=50)
-        # return as lists for JSON serialization
         return {'var': float(var), 'hist': {'bins': bin_edges.tolist(), 'counts': counts.tolist()}}
     except Exception as e:
         return {'var': 0.0, 'hist': {'bins': [], 'counts': []}, 'error': str(e)}
+
+
+@app.get("/survival")
+def survival(period: Optional[str] = None, loan_purpose: Optional[str] = None):
+    """Return a simple Kaplan-Meier style survival curve for the cohort."""
+    try:
+        df = insights.load_data(period)
+        if df is None or df.empty:
+            return {'months': [], 'survival': [], 'events': [], 'at_risk': [], 'median_months': None, 'n_loans': 0}
+        if loan_purpose:
+            vals = [v.strip() for v in loan_purpose.split(',') if v.strip()]
+            if 'loan_purpose' not in df.columns and 'purpose' in df.columns:
+                df['loan_purpose'] = df['purpose']
+            if 'loan_purpose' in df.columns:
+                df = df[df['loan_purpose'].isin(vals)]
+        result = risk_metrics.survival(df)
+        return result
+    except Exception as e:
+        return {'months': [], 'survival': [], 'events': [], 'at_risk': [], 'median_months': None, 'n_loans': 0, 'error': str(e)}
