@@ -9,7 +9,6 @@ catboost
 httpx
 dash_bootstrap_components
 plotly
-requests
-numerize
-functools
-pandas
+# requests
+# numerize
+# pandas
