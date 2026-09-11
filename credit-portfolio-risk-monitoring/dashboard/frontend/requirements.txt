@@ -9,6 +9,7 @@ catboost
 httpx
 dash_bootstrap_components
 plotly
+flask_caching
 # requests
 numerize
 # pandas
