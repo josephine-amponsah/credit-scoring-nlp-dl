@@ -36,79 +36,8 @@ pio.templates.default = "flatly"
 
 app = dash.Dash(__name__, use_pages=True, external_stylesheets=[
                 dbc.themes.FLATLY, dbc.icons.BOOTSTRAP, dbc_css, dbc.icons.BOOTSTRAP, dbc.icons.FONT_AWESOME])
-app.index_string = """
-<!DOCTYPE html>
-<html>
-    <head>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
-        <style>
-            .navbar {
-                --bs-navbar-color: rgba(255,255,255,0.8);
-                --bs-navbar-hover-color: rgba(255,255,255,1);
-                --bs-navbar-active-color: #18bc9c;
-            }
-            .navbar .nav-link {
-                color: rgba(255,255,255,0.8) !important;
-                border-radius: 0.35rem;
-                padding: 0.55rem 0.85rem;
-                transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out;
-            }
-            .navbar .nav-link:hover,
-            .navbar .nav-link:focus {
-                color: #ffffff !important;
-                background-color: rgba(255,255,255,0.08);
-            }
-            .navbar .nav-link.active {
-                color: #18bc9c !important;
-                background-color: rgba(255,255,255,0.04);
-            }
-            .page-shell {
-                margin-top: 0.75rem;
-                padding: 1.25rem 1.25rem 0.5rem;
-                background: #f8f9fa;
-                border-radius: 0.5rem;
-                border: 1px solid rgba(52, 73, 94, 0.1);
-            }
-            .page-shell .form-label {
-                color: #2c3e50;
-                font-size: 0.78rem;
-                font-weight: 700;
-                letter-spacing: 0.02em;
-                text-transform: uppercase;
-            }
-            .page-shell .card {
-                border: 1px solid rgba(44, 62, 80, 0.12);
-                background-color: #ffffff;
-                box-shadow: 0 0.125rem 0.5rem rgba(44, 62, 80, 0.06);
-            }
-            .page-shell .card-title {
-                color: #7b8a8b;
-                font-size: 0.75rem;
-                letter-spacing: 0.04em;
-                text-transform: uppercase;
-            }
-            .page-shell .card h4 {
-                color: #2c3e50;
-            }
-            body {
-                background-color: #f5f7fa;
-            }
-        </style>
-    </head>
-    <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
-    </body>
-</html>
-"""
-server = app.run
+
+server = app.server
 
 
 data_url = "https://github.com/josephine-amponsah/credit-scoring-nlp-dl/tree/main/credit-portfolio-risk-monitoring/notebooks/data_splits"
