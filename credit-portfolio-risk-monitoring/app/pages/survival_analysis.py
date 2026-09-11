@@ -20,13 +20,20 @@ layout = html.Div([
     dcc.Store(id = "sales-data"),
     dbc.Row([
         dbc.Col([
-            dcc.Dropdown( placeholder = 'Select period', id = 'date-time-filter',
-                 className="dbc year-dropdown .Select-control", value = None) 
-            ], width=2),
+            html.Label('Period', className='form-label'),
+            dcc.Dropdown(
+                placeholder = 'Select period',
+                id = 'date-time-filter',
+                clearable=True,
+                searchable=True,
+                style={'borderRadius': '0.5rem'},
+                value = None
+            )
+        ], width=3),
         dbc.Col([
-            html.Button( 'Download Risk Report', id = 'downloader',
-                 className="btn btn-info") 
-            ], width = 2),
-    ], justify= 'end'),
+            html.Label('Actions', className='form-label'),
+            dbc.Button('Download Risk Report', id = 'downloader', color='primary', className='w-100')
+        ], width = 2),
+    ], align='end', className='g-3 mb-3'),
     html.Br()
 ])

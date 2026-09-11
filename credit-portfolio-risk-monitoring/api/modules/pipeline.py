@@ -15,23 +15,6 @@ DEFAULT_SCALER = os.path.join(os.path.dirname(__file__), "..", "..", "credit-ris
 DEFAULT_LE = os.path.join(os.path.dirname(__file__), "..", "..", "credit-risk-scorecard", "artefacts", "le_dict.pkl")
 
 # Features list taken from lending_club_ml notebook (training keep_cols)
-keep_cols = ['funded_amnt', 'term','int_rate','installment', 'emp_length','home_ownership',
-    'annual_inc','verification_status','pymnt_plan','title','purpose', 'zip_code','addr_state','dti',
-    'delinq_2yrs','inq_last_6mths','mths_since_last_delinq','mths_since_last_record','pub_rec','revol_bal',
-    'revol_util','total_acc','initial_list_status','out_prncp_inv','policy_code','application_type',
-    'annual_inc_joint','dti_joint','verification_status_joint','total_rev_hi_lim','inq_fi',
-    'total_cu_tl','inq_last_12m','acc_open_past_24mths','avg_cur_bal','bc_open_to_buy','bc_util',
-    'mo_sin_old_il_acct','mo_sin_old_rev_tl_op','mo_sin_rcnt_rev_tl_op',
-    'mo_sin_rcnt_tl','mort_acc','mths_since_recent_bc','mths_since_recent_inq','num_actv_bc_tl','num_actv_rev_tl',
-    'num_bc_sats','num_bc_tl','num_il_tl','num_op_rev_tl','num_rev_accts','num_rev_tl_bal_gt_0',
-    'num_sats','num_tl_op_past_12m','percent_bc_gt_75','pub_rec_bankruptcies','tax_liens',
-    'tot_hi_cred_lim','total_bal_ex_mort','total_bc_limit','total_il_high_credit_limit',
-    'revol_bal_joint','sec_app_inq_last_6mths','sec_app_mort_acc','sec_app_open_acc',
-    'sec_app_revol_util','sec_app_open_act_il','sec_app_num_rev_accts',
-    'loan_status','grade','sub_grade', 'issue_d', 'fico_range_low', 'fico_range_high', 
-    'last_fico_range_high', 'last_fico_range_low',
-    ]
-
 
 def load_artifacts(model_candidates=None, scaler_path=None, le_path=None):
     model_candidates = model_candidates or DEFAULT_MODEL_CANDIDATES

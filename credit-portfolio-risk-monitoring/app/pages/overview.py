@@ -22,29 +22,45 @@ layout = html.Div([
     dcc.Store(id="sales-data"),
     dbc.Row([
         dbc.Col([
-            dcc.Dropdown(placeholder='Select period', id='date-time-filter', className="dbc year-dropdown .Select-control", value=None)
+            html.Label('Period', className='form-label'),
+            dcc.Dropdown(
+                placeholder='Select period',
+                id='date-time-filter',
+                clearable=True,
+                searchable=True,
+                style={'borderRadius': '0.5rem'}
+            )
         ], width=3),
         dbc.Col([
-            dcc.Dropdown(placeholder='Loan purpose', id='loan-purpose-filter', multi=True)
+            html.Label('Loan purpose', className='form-label'),
+            dcc.Dropdown(
+                placeholder='Select loan purpose',
+                id='loan-purpose-filter',
+                multi=True,
+                clearable=True,
+                searchable=True,
+                style={'borderRadius': '0.5rem'}
+            )
         ], width=4),
         dbc.Col([
-            html.Button('Download Risk Report', id='downloader', className="btn btn-info")
+            html.Label('Actions', className='form-label'),
+            dbc.Button('Download Risk Report', id='downloader', color='primary', className='w-100')
         ], width=2),
-    ], justify='end'),
+    ], align='end', className='g-3 mb-3'),
 
     html.Br(),
 
     # summary cards
     dbc.Row([
-        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Total Lent", className="card-title"), html.H4(id='card-total-lent')])]), width=3),
-        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Repayments", className="card-title"), html.H4(id='card-repaid')])]), width=3),
-        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Default Rate", className="card-title"), html.H4(id='card-default-rate')])]), width=3),
-        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Interest Earned", className="card-title"), html.H4(id='card-interest')])]), width=3),
-    ], className='mb-3'),
+        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Total Lent", className="card-title"), html.H4(id='card-total-lent', className='mb-0')])], className='h-100 shadow-sm border-0'), width=3),
+        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Repayments", className="card-title"), html.H4(id='card-repaid', className='mb-0')])], className='h-100 shadow-sm border-0'), width=3),
+        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Default Rate", className="card-title"), html.H4(id='card-default-rate', className='mb-0')])], className='h-100 shadow-sm border-0'), width=3),
+        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Interest Earned", className="card-title"), html.H4(id='card-interest', className='mb-0')])], className='h-100 shadow-sm border-0'), width=3),
+    ], className='g-3 mb-3'),
 
     # bar chart
     dbc.Row([
-        dbc.Col(dcc.Graph(id='overview-bar-chart'), width=12)
+        dbc.Col(dbc.Card([dbc.CardBody(dcc.Graph(id='overview-bar-chart', config={'displayModeBar': False}, style={'height': '360px'}))], className='shadow-sm border-0'), width=12)
     ]),
 
     html.Br()

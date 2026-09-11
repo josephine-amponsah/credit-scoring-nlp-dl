@@ -26,20 +26,28 @@ layout = html.Div([
     dcc.Store(id='sales-data'),
     dbc.Row([
         dbc.Col([
-            dcc.Dropdown(placeholder='Select period', id='date-time-filter', className="dbc year-dropdown .Select-control", value=None)
+            html.Label('Period', className='form-label'),
+            dcc.Dropdown(
+                placeholder='Select period',
+                id='date-time-filter',
+                clearable=True,
+                searchable=True,
+                style={'borderRadius': '0.5rem'}
+            )
         ], width=3),
         dbc.Col([
-            html.Button('Download Risk Report', id='downloader', className="btn btn-info")
+            html.Label('Actions', className='form-label'),
+            dbc.Button('Download Risk Report', id='downloader', color='primary', className='w-100')
         ], width=2),
-    ], justify='end'),
+    ], align='end', className='g-3 mb-3'),
     html.Br(),
 
     dbc.Row([
-        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Expected Loss", className="card-title"), html.H4(id='card-expected-loss')])]), width=3),
-        dbc.Col(dbc.Card([dbc.CardBody([html.H6("VaR (95%)", className="card-title"), html.H4(id='card-var')])]), width=3),
-    ], className='mb-3'),
+        dbc.Col(dbc.Card([dbc.CardBody([html.H6("Expected Loss", className="card-title"), html.H4(id='card-expected-loss', className='mb-0')])], className='h-100 shadow-sm border-0'), width=3),
+        dbc.Col(dbc.Card([dbc.CardBody([html.H6("VaR (95%)", className="card-title"), html.H4(id='card-var', className='mb-0')])], className='h-100 shadow-sm border-0'), width=3),
+    ], className='g-3 mb-3'),
     dbc.Row([
-        dbc.Col(dcc.Graph(id='risk-dist-chart'), width=12)
+        dbc.Col(dbc.Card([dbc.CardBody(dcc.Graph(id='risk-dist-chart', config={'displayModeBar': False}, style={'height': '360px'}))], className='shadow-sm border-0'), width=12)
     ]),
     html.Br()
 ])

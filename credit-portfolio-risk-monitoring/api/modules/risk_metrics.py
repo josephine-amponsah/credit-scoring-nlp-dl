@@ -1,55 +1,13 @@
 import pandas as pd
-import joblib
 import typing
 import numpy as np
-import os
-import subprocess
-import tempfile
-import json
-import sys
 from typing import Tuple, List
 
 
 
-def scale_probs(X, model_path='../models/xgbmodel1.pkl'):
-    """Predict probabilities by running a separate worker process.
-
-    This isolates model unpickling/prediction into a subprocess to avoid
-    crashing the main API process if a native extension misbehaves.
-    """
-    # prepare input CSV
-    with tempfile.TemporaryDirectory() as td:
-        in_csv = os.path.join(td, 'input.csv')
-        out_json = os.path.join(td, 'out.json')
-        # write numeric columns to CSV (worker will select features)
-        X.to_csv(in_csv, index=False)
-        # model file absolute path
-        model_abspath = os.path.join(os.path.dirname(__file__), '..', 'models', os.path.basename(model_path))
-        worker = os.path.join(os.path.dirname(__file__), 'predict_worker.py')
-        cmd = [sys.executable, worker, '--model', model_abspath, '--input', in_csv, '--output', out_json]
-        try:
-            proc = subprocess.run(cmd, check=False, capture_output=True, timeout=60)
-        except Exception as e:
-            raise RuntimeError(f'prediction subprocess failed: {e}')
-        # if worker crashed (non-zero) try to surface readable error
-        if proc.returncode != 0:
-            stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ''
-            stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ''
-            # attempt to parse json error in stdout
-            try:
-                payload = json.loads(stdout.strip()) if stdout.strip() else {}
-                if 'error' in payload:
-                    raise RuntimeError(f'worker error: {payload.get("error")}; stderr: {stderr}')
-            except Exception:
-                raise RuntimeError(f'prediction worker failed, rc={proc.returncode}; stdout={stdout}; stderr={stderr}')
-        # read out.json
-        try:
-            with open(out_json, 'r') as f:
-                payload = json.load(f)
-            probs = payload.get('probs', [])
-            return np.asarray(probs, dtype=float)
-        except Exception as e:
-            raise RuntimeError(f'failed to read worker output: {e}')
+# Worker-based scoring removed. The pipeline expects `prob_default` to be present
+# in input DataFrames. We min-max scale raw probabilities into `scaled_probs`
+# for downstream metric computations.
     
 def expected_loss(X):
     """Compute expected loss given a DataFrame with either a `scaled_probs` column
@@ -59,15 +17,21 @@ def expected_loss(X):
     Returns total expected loss and the per-loan EL series.
     """
     df = X.copy()
-    if 'scaled_probs' not in df.columns:
-        # try to score using default model in ../models/xgbmodel1.pkl
-        try:
-            df['scaled_probs'] = scale_probs(df)
-        except Exception:
-            df['scaled_probs'] = 0.0
-    probs = df['scaled_probs'].astype(float).fillna(0.0)
+    # Use dataset-provided raw PDs (`prob_default`). If absent, assume zeros.
+    raw_probs = df['prob_default'].astype(float).fillna(0.0) if 'prob_default' in df.columns else pd.Series(0.0, index=df.index)
+
+    # min-max scale into `scaled_probs` for stability in metrics and simulation
+    a = raw_probs.astype(float).fillna(0.0)
+    lo = a.min()
+    hi = a.max()
+    if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
+        scaled = (a - lo) / (hi - lo)
+    else:
+        scaled = a.clip(0.0, 1.0)
+    df['scaled_probs'] = scaled
+
     exposure = df.get('funded_amnt', pd.Series([0]*len(df))).astype(float).fillna(0.0)
-    el = probs * exposure
+    el = df['scaled_probs'] * exposure
     return float(el.sum()), el
 
 def npv(X):
@@ -86,12 +50,14 @@ def simulate_portfolio_losses(df: pd.DataFrame, nsim: int = 10000, seed: typing.
     Returns an array of simulated total losses (same currency as `funded_amnt`).
     """
     rnd = np.random.RandomState(seed)
-    if 'scaled_probs' not in df.columns:
-        try:
-            df['scaled_probs'] = scale_probs(df)
-        except Exception:
-            df['scaled_probs'] = 0.0
-    probs = np.clip(df['scaled_probs'].astype(float).fillna(0.0).values, 0.0, 1.0)
+    # use provided raw PDs and min-max scale into [0,1]
+    raw = df['prob_default'].astype(float).fillna(0.0) if 'prob_default' in df.columns else pd.Series(0.0, index=df.index)
+    lo = raw.min()
+    hi = raw.max()
+    if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
+        probs = np.clip(((raw - lo) / (hi - lo)).values, 0.0, 1.0)
+    else:
+        probs = np.clip(raw.values, 0.0, 1.0)
     exposure = df.get('funded_amnt', pd.Series([0]*len(df))).astype(float).fillna(0.0).values
     # shape (nsim, n_loans): draw bernoulli for each loan
     # to save memory, simulate in chunks if needed
