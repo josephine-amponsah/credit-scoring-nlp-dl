@@ -7,3 +7,11 @@ scikit-learn
 xgboost
 catboost
 httpx
+dash_bootstrap_components
+plotly
+json
+requests
+numerize
+functools
+pandas
+sys
