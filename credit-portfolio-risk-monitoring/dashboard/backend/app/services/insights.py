@@ -17,13 +17,13 @@ import json
 import requests
 import pandas as pd
 import functools
+from pathlib import Path
 from typing import Optional, List, Dict
 
-# Default remote data_splits location used by the app frontend
-DEFAULT_DATA_URL = (
-	"https://github.com/josephine-amponsah/credit-scoring-nlp-dl"
-	"/tree/main/credit-portfolio-risk-monitoring/notebooks/data_splits"
-)
+# Prefer the deployed backend data directory. This repository is structured so
+# the data is stored under dashboard/backend/app/data rather than a GitHub URL.
+DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
+DEFAULT_DATA_URL = str(DEFAULT_DATA_DIR)
 
 
 def _read_bytes_to_df(content: bytes, name: str) -> pd.DataFrame:
@@ -63,31 +63,38 @@ def _list_remote_datafiles(data_url: str, timeout: int = 10) -> List[str]:
 def load_data(period: Optional[str] = None, data_url: str = DEFAULT_DATA_URL, timeout: int = 10) -> pd.DataFrame:
 	"""Load data for a given quarter period (e.g. '2018Q4').
 
-	If `period` is None the latest available period is selected from the
-	remote listing. The function returns an empty DataFrame on failure.
+	This deployment uses the backend data directory, so the function prefers the
+	local parquet files under dashboard/backend/app/data before any remote fetch.
 	"""
 	try:
-		# Support local development: prefer local copies if available
-		local_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'notebooks', 'data_splits')
-		local_dir = os.path.normpath(local_dir)
-		if os.path.isdir(local_dir):
+		local_dirs = [
+			Path(data_url) if data_url and Path(data_url).exists() else None,
+			Path(__file__).resolve().parents[1] / 'data',
+			Path(__file__).resolve().parents[3] / 'notebooks' / 'data_splits',
+		]
+		for local_dir in local_dirs:
+			if local_dir is None or not local_dir.exists():
+				continue
 			names = [n for n in os.listdir(local_dir) if n.startswith('data_')]
-			if names:
-				if not period:
-					period = sorted([n.split('data_')[1].split('.')[0] for n in names])[-1]
-				for ext in ('.parquet', '.csv.gz', '.csv'):
-					p = os.path.join(local_dir, f"data_{period}{ext}")
-					if os.path.exists(p):
-						try:
-							if p.endswith('.parquet'):
-								df = pd.read_parquet(p)
-							else:
-								df = pd.read_csv(p, parse_dates=['issue_d'], low_memory=False)
-							return _normalize_object_columns(df)
-						except Exception:
-							continue
+			if not names:
+				continue
+			if not period:
+				period = sorted([n.split('data_')[1].split('.')[0] for n in names])[-1]
+			for ext in ('.parquet', '.csv.gz', '.csv'):
+				p = local_dir / f"data_{period}{ext}"
+				if p.exists():
+					try:
+						if p.suffix == '.parquet':
+							df = pd.read_parquet(p)
+						else:
+							df = pd.read_csv(p, parse_dates=['issue_d'], low_memory=False)
+						return _normalize_object_columns(df)
+					except Exception:
+						continue
 
-		# Remote: query GitHub contents API and fetch raw file
+		# Remote fallback only if the local backend folder is unavailable.
+		if not data_url or not data_url.startswith('https://'):
+			return pd.DataFrame()
 		owner_repo, rest = data_url.replace('https://github.com/', '').split('/tree/', 1)
 		branch, _, path = rest.partition('/')
 		api_url = f"https://api.github.com/repos/{owner_repo}/contents/{path}"
