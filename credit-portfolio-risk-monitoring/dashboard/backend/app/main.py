@@ -14,6 +14,16 @@ from .services import insights, risk_metrics
 
 app = FastAPI()
 
+# backend/app/main.py
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://dashboard-credit-risk.onrender.com"],  # or ["*"] while testing
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # @dataclass
 # class Selection(BaseModel):
 #     X : list[float]
