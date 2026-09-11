@@ -10,5 +10,5 @@ httpx
 dash_bootstrap_components
 plotly
 # requests
-# numerize
+numerize
 # pandas
