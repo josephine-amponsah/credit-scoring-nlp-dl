@@ -89,11 +89,14 @@ def overview_periods():
 @app.get("/risk/expected_loss")
 def risk_expected_loss(period: Optional[str] = None):
     """Return total expected loss and simple breakdown for the requested period."""
-    df = insights.load_data(period)
-    if df is None or df.empty:
-        return {'total_expected_loss': 0.0, 'n_loans': 0}
-    total_el, per_loan = risk_metrics.expected_loss(df)
-    return {'total_expected_loss': total_el, 'n_loans': int(len(df))}
+    try:
+        df = insights.load_data(period)
+        if df is None or df.empty:
+            return {'total_expected_loss': 0.0, 'n_loans': 0}
+        total_el, per_loan = risk_metrics.expected_loss(df)
+        return {'total_expected_loss': total_el, 'n_loans': int(len(df))}
+    except Exception as e:
+        return {'total_expected_loss': 0.0, 'n_loans': 0, 'error': str(e)}
 
 
 @app.get("/risk/var")
@@ -105,15 +108,18 @@ def risk_var(period: Optional[str] = None, confidence: Optional[float] = 0.95, n
     - confidence: VaR confidence (0-1)
     - nsim: number of Monte Carlo simulations
     """
-    df = insights.load_data(period)
-    if df is None or df.empty:
-        return {'var': 0.0, 'hist': {'bins': [], 'counts': []}}
-    losses = risk_metrics.simulate_portfolio_losses(df, nsim=int(nsim))
-    if losses.size == 0:
-        return {'var': 0.0, 'hist': {'bins': [], 'counts': []}}
-    var = risk_metrics.var_from_simulations(losses, confidence=float(confidence))
-    # histogram
-    import numpy as _np
-    counts, bin_edges = _np.histogram(losses, bins=50)
-    # return as lists for JSON serialization
-    return {'var': float(var), 'hist': {'bins': bin_edges.tolist(), 'counts': counts.tolist()}}
+    try:
+        df = insights.load_data(period)
+        if df is None or df.empty:
+            return {'var': 0.0, 'hist': {'bins': [], 'counts': []}}
+        losses = risk_metrics.simulate_portfolio_losses(df, nsim=int(nsim))
+        if losses.size == 0:
+            return {'var': 0.0, 'hist': {'bins': [], 'counts': []}}
+        var = risk_metrics.var_from_simulations(losses, confidence=float(confidence))
+        # histogram
+        import numpy as _np
+        counts, bin_edges = _np.histogram(losses, bins=50)
+        # return as lists for JSON serialization
+        return {'var': float(var), 'hist': {'bins': bin_edges.tolist(), 'counts': counts.tolist()}}
+    except Exception as e:
+        return {'var': 0.0, 'hist': {'bins': [], 'counts': []}, 'error': str(e)}

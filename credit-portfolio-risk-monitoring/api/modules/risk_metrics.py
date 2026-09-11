@@ -3,48 +3,53 @@ import joblib
 import typing
 import numpy as np
 import os
+import subprocess
+import tempfile
+import json
+import sys
 from typing import Tuple, List
 
 
 
-def scale_probs(X, model_path = '../models/xgbmodel1.pkl' ):
-    """Load a classifier and return predicted default probabilities for rows in X.
+def scale_probs(X, model_path='../models/xgbmodel1.pkl'):
+    """Predict probabilities by running a separate worker process.
 
-    The function attempts to select the model's expected feature columns if available
-    (`feature_names_in_`), otherwise it will try to use numeric columns from X.
-    Returns a 1D numpy array of probabilities for the positive/default class.
+    This isolates model unpickling/prediction into a subprocess to avoid
+    crashing the main API process if a native extension misbehaves.
     """
-    model = joblib.load(os.path.join(os.path.dirname(__file__), '..', 'models', os.path.basename(model_path)))
-    # find feature columns
-    if hasattr(model, 'feature_names_in_'):
-        features = list(model.feature_names_in_)
-    else:
-        # fallback: use numeric columns excluding identifier/date-like columns
-        features = X.select_dtypes(include=[np.number]).columns.tolist()
-        # if 'funded_amnt' present, keep it too (but numeric already)
-    if not features:
-        raise ValueError('No feature columns found for scoring')
-    # ensure features exist in X
-    missing = [c for c in features if c not in X.columns]
-    if missing:
-        # try to reduce to intersection
-        features = [c for c in features if c in X.columns]
-    if not features:
-        raise ValueError('No model feature columns present in input dataframe')
-    Xf = X[features].fillna(0)
-    # predict_proba may exist (sklearn/XGBoost wrapper)
-    if hasattr(model, 'predict_proba'):
-        probs = model.predict_proba(Xf)
-        # assume positive class is column 1
-        if probs.ndim == 2 and probs.shape[1] > 1:
-            return np.asarray(probs[:, 1], dtype=float)
-        # fallback: if single-column, return it
-        return np.asarray(probs.ravel(), dtype=float)
-    # fallback: some models expose predict which returns scores; try to use it
-    if hasattr(model, 'predict'):
-        preds = model.predict(Xf)
-        return np.asarray(preds, dtype=float)
-    raise ValueError('Model has no predict_proba or predict')
+    # prepare input CSV
+    with tempfile.TemporaryDirectory() as td:
+        in_csv = os.path.join(td, 'input.csv')
+        out_json = os.path.join(td, 'out.json')
+        # write numeric columns to CSV (worker will select features)
+        X.to_csv(in_csv, index=False)
+        # model file absolute path
+        model_abspath = os.path.join(os.path.dirname(__file__), '..', 'models', os.path.basename(model_path))
+        worker = os.path.join(os.path.dirname(__file__), 'predict_worker.py')
+        cmd = [sys.executable, worker, '--model', model_abspath, '--input', in_csv, '--output', out_json]
+        try:
+            proc = subprocess.run(cmd, check=False, capture_output=True, timeout=60)
+        except Exception as e:
+            raise RuntimeError(f'prediction subprocess failed: {e}')
+        # if worker crashed (non-zero) try to surface readable error
+        if proc.returncode != 0:
+            stderr = proc.stderr.decode('utf-8', errors='replace') if proc.stderr else ''
+            stdout = proc.stdout.decode('utf-8', errors='replace') if proc.stdout else ''
+            # attempt to parse json error in stdout
+            try:
+                payload = json.loads(stdout.strip()) if stdout.strip() else {}
+                if 'error' in payload:
+                    raise RuntimeError(f'worker error: {payload.get("error")}; stderr: {stderr}')
+            except Exception:
+                raise RuntimeError(f'prediction worker failed, rc={proc.returncode}; stdout={stdout}; stderr={stderr}')
+        # read out.json
+        try:
+            with open(out_json, 'r') as f:
+                payload = json.load(f)
+            probs = payload.get('probs', [])
+            return np.asarray(probs, dtype=float)
+        except Exception as e:
+            raise RuntimeError(f'failed to read worker output: {e}')
     
 def expected_loss(X):
     """Compute expected loss given a DataFrame with either a `scaled_probs` column
