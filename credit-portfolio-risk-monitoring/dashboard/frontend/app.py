@@ -14,6 +14,7 @@ import os
 import io
 import requests
 import functools
+from pathlib import Path
 
 from flask_caching import Cache
 sys.path.insert(0, '../modules')
@@ -40,7 +41,7 @@ app = dash.Dash(__name__, use_pages=True, external_stylesheets=[
 server = app.server
 
 
-data_url = "https://github.com/josephine-amponsah/credit-scoring-nlp-dl/tree/main/credit-portfolio-risk-monitoring/notebooks/data_splits"
+BACKEND_DATA_DIR = Path(__file__).resolve().parents[1] / 'backend' / 'app' / 'data'
 timeout = 20
 
 # Use simple in-memory cache by default to avoid filesystem backend import issues.
@@ -65,40 +66,35 @@ if cache is None:
             return _decorator
     cache = _CacheStub()
 
+
 def _app_data_impl(period: str | None = None):
     try:
-        if not (data_url.startswith('https://github.com/') and '/tree/' in data_url):
+        if not BACKEND_DATA_DIR.exists():
             return json.dumps({})
-        owner_repo, rest = data_url.replace('https://github.com/', '').split('/tree/', 1)
-        branch, _, path = rest.partition('/')
 
-        api_url = f"https://api.github.com/repos/{owner_repo}/contents/{path}"
-        resp = requests.get(api_url, params={'ref': branch}, timeout=10)
-        if resp.status_code != 200:
+        files = sorted(BACKEND_DATA_DIR.glob('data_*.parquet'))
+        if not files:
+            files = sorted(BACKEND_DATA_DIR.glob('data_*.csv'))
+        if not files:
             return json.dumps({})
-        items = resp.json()
-        names = [it['name'] for it in items if it.get('name', '').startswith('data_')]
-        if not names:
-            return json.dumps({})
-        if not period:
-            period = sorted([n.split('data_')[1].split('.')[0] for n in names])[-1]
 
-        raw_base = f"https://raw.githubusercontent.com/{owner_repo}/{branch}/{path}".rstrip('/')
-        for name in (f"data_{period}.parquet", f"data_{period}.csv.gz", f"data_{period}.csv"):
-            r = requests.get(f"{raw_base}/{name}", timeout=10)
-            if r.status_code != 200:
-                continue
-            try:
-                if name.endswith('.parquet'):
-                    df = pd.read_parquet(io.BytesIO(r.content))
-                else:
-                    df = pd.read_csv(io.BytesIO(r.content), parse_dates=['issue_d'], low_memory=False)
-                for c in df.select_dtypes(include=['object']).columns:
-                    df[c] = df[c].apply(lambda v: None if pd.isna(v) else (v.decode('utf-8', 'replace') if isinstance(v, (bytes, bytearray)) else str(v)))
-                return df.to_json(date_format='iso')
-            except Exception:
-                continue
-        return json.dumps({})
+        if period:
+            matches = [p for p in files if p.stem == f'data_{period}']
+            if matches:
+                target = matches[0]
+            else:
+                return json.dumps({})
+        else:
+            target = files[-1]
+
+        try:
+            df = pd.read_parquet(target)
+        except Exception:
+            df = pd.read_csv(target, parse_dates=['issue_d'], low_memory=False)
+
+        for c in df.select_dtypes(include=['object']).columns:
+            df[c] = df[c].apply(lambda v: None if pd.isna(v) else (v.decode('utf-8', 'replace') if isinstance(v, (bytes, bytearray)) else str(v)))
+        return df.to_json(date_format='iso')
     except Exception:
         return json.dumps({})
 
