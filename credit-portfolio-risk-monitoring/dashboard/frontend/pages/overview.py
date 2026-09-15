@@ -1,19 +1,11 @@
 import dash
-from dash import Dash, html, dcc, Input, Output, callback, State
-import plotly.express as px
-from dash import dash_table
+from dash import html, dcc, Input, Output, callback
 import pandas as pd
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
-import sys
-import json
 import numerize
-from numerize import numerize
-import os
-import requests
 
-from flask_caching import Cache
-sys.path.insert(0, '../modules')
+from services.api_client import get_summary, get_aggregates, get_options, get_periods
 
 # app = Dash(__name__)
 dash.register_page(__name__, path = "/")
@@ -66,29 +58,14 @@ layout = html.Div([
     html.Br()
 ])
 
-# API base (browser will call this path). Adjust via env if needed.
-# The FastAPI app exposes routes at the root (e.g. /overview/...),
-# so the Dash frontend should point to the API root (no extra /api prefix).
-API_BASE = os.environ.get('API_BASE', 'http://127.0.0.1:8050')
-
-
-
-
 # Summary cards: call API for totals
 @callback(
     [Output('card-total-lent', 'children'), Output('card-repaid', 'children'), Output('card-default-rate', 'children'), Output('card-interest', 'children')],
     [Input('date-time-filter', 'value'), Input('loan-purpose-filter', 'value')]
 )
 def update_summary(period, loan_purposes):
-    params = {}
-    if period:
-        params['period'] = period
-    if loan_purposes:
-        params['loan_purpose'] = ','.join(loan_purposes) if isinstance(loan_purposes, (list, tuple)) else str(loan_purposes)
     try:
-        resp = requests.get(f"{API_BASE}/overview/summary", params=params, timeout=10)
-        resp.raise_for_status()
-        payload = resp.json()
+        payload = get_summary(period, loan_purposes)
         total = numerize.numerize(payload.get('total_lent', 0))
         repaid = numerize.numerize(payload.get('repaid', 0))
         default_rate = f"{payload.get('default_rate', 0):.2%}"
@@ -104,15 +81,9 @@ def update_summary(period, loan_purposes):
     [Input('date-time-filter', 'value'), Input('loan-purpose-filter', 'value')]
 )
 def update_bar(period, loan_purposes):
-    params = {}
-    if period:
-        params['period'] = period
-    if loan_purposes:
-        params['loan_purpose'] = ','.join(loan_purposes) if isinstance(loan_purposes, (list, tuple)) else str(loan_purposes)
     try:
-        resp = requests.get(f"{API_BASE}/overview/aggregates", params=params, timeout=10)
-        resp.raise_for_status()
-        data = resp.json().get('data', [])
+        payload = get_aggregates(period, loan_purposes)
+        data = payload.get('data', []) if isinstance(payload, dict) else payload
         if not data:
             return go.Figure()
         df = pd.DataFrame(data)
@@ -133,13 +104,8 @@ def update_bar(period, loan_purposes):
     Input('date-time-filter', 'value')
 )
 def load_loan_purposes(period):
-    params = {}
-    if period:
-        params['period'] = period
     try:
-        resp = requests.get(f"{API_BASE}/overview/options", params=params, timeout=10)
-        resp.raise_for_status()
-        opts = resp.json().get('loan_purposes', [])
+        opts = get_options(period).get('loan_purposes', [])
         options = [{'label': o, 'value': o} for o in opts]
         values = [o['value'] for o in options]
         return options, values
@@ -155,9 +121,7 @@ def load_loan_purposes(period):
 )
 def load_periods(_store_data):
     try:
-        resp = requests.get(f"{API_BASE}/overview/periods", timeout=10)
-        resp.raise_for_status()
-        periods = resp.json().get('periods', [])
+        periods = get_periods().get('periods', [])
         options = [{'label': p, 'value': p} for p in periods]
         value = periods[-1] if periods else None
         return options, value

@@ -59,8 +59,8 @@ def _list_remote_datafiles(data_url: str, timeout: int = 10) -> List[str]:
 	return [it['name'] for it in items if it.get('name', '').startswith('data_')]
 
 
-@functools.lru_cache(maxsize=32)
-def load_data(period: Optional[str] = None, data_url: str = DEFAULT_DATA_URL, timeout: int = 10) -> pd.DataFrame:
+@functools.lru_cache(maxsize=3)
+def load_data(period=None, data_url=DEFAULT_DATA_URL, timeout=10) -> pd.DataFrame:
 	"""Load data for a given quarter period (e.g. '2018Q4').
 
 	This deployment uses the backend data directory, so the function prefers the

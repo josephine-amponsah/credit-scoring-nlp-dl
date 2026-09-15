@@ -67,47 +67,47 @@ if cache is None:
     cache = _CacheStub()
 
 
-def _app_data_impl(period: str | None = None):
-    try:
-        if not BACKEND_DATA_DIR.exists():
-            return json.dumps({})
+# def _app_data_impl(period: str | None = None):
+#     try:
+#         if not BACKEND_DATA_DIR.exists():
+#             return json.dumps({})
 
-        files = sorted(BACKEND_DATA_DIR.glob('data_*.parquet'))
-        if not files:
-            files = sorted(BACKEND_DATA_DIR.glob('data_*.csv'))
-        if not files:
-            return json.dumps({})
+#         files = sorted(BACKEND_DATA_DIR.glob('data_*.parquet'))
+#         if not files:
+#             files = sorted(BACKEND_DATA_DIR.glob('data_*.csv'))
+#         if not files:
+#             return json.dumps({})
 
-        if period:
-            matches = [p for p in files if p.stem == f'data_{period}']
-            if matches:
-                target = matches[0]
-            else:
-                return json.dumps({})
-        else:
-            target = files[-1]
+#         if period:
+#             matches = [p for p in files if p.stem == f'data_{period}']
+#             if matches:
+#                 target = matches[0]
+#             else:
+#                 return json.dumps({})
+#         else:
+#             target = files[-1]
 
-        try:
-            df = pd.read_parquet(target)
-        except Exception:
-            df = pd.read_csv(target, parse_dates=['issue_d'], low_memory=False)
+#         try:
+#             df = pd.read_parquet(target)
+#         except Exception:
+#             df = pd.read_csv(target, parse_dates=['issue_d'], low_memory=False)
 
-        for c in df.select_dtypes(include=['object']).columns:
-            df[c] = df[c].apply(lambda v: None if pd.isna(v) else (v.decode('utf-8', 'replace') if isinstance(v, (bytes, bytearray)) else str(v)))
-        return df.to_json(date_format='iso')
-    except Exception:
-        return json.dumps({})
+#         for c in df.select_dtypes(include=['object']).columns:
+#             df[c] = df[c].apply(lambda v: None if pd.isna(v) else (v.decode('utf-8', 'replace') if isinstance(v, (bytes, bytearray)) else str(v)))
+#         return df.to_json(date_format='iso')
+#     except Exception:
+#         return json.dumps({})
 
 
-# Apply caching: prefer Flask-Caching if initialized, otherwise use functools.lru_cache
-if cache:
-    app_data = cache.memoize(timeout=timeout)(_app_data_impl)
-else:
-    app_data = functools.lru_cache(maxsize=32)(_app_data_impl)
+# # Apply caching: prefer Flask-Caching if initialized, otherwise use functools.lru_cache
+# if cache:
+#     app_data = cache.memoize(timeout=timeout)(_app_data_impl)
+# else:
+#     app_data = functools.lru_cache(maxsize=32)(_app_data_impl)
     
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
-    dcc.Store(id ="sales-store", data = app_data()),
+    # dcc.Store(id ="sales-store", data = app_data()),
     dbc.Row([
             html.Nav([
                 html.Div([
