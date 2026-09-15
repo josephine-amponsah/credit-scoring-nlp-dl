@@ -152,15 +152,10 @@ def survival(X):
     }
 
 
-def simulate_portfolio_losses(df: pd.DataFrame, nsim: int = 10000, seed: typing.Optional[int] = None) -> np.ndarray:
-    """Simulate portfolio loss distribution using Bernoulli defaults per loan.
-
-    Returns an array of simulated total losses (same currency as `funded_amnt`).
-    """
+def simulate_portfolio_losses(df, nsim=2000, seed=None, batch_size=500):
     rnd = np.random.RandomState(seed)
     raw = df['prob_default'].astype(float).fillna(0.0) if 'prob_default' in df.columns else pd.Series(0.0, index=df.index)
-    lo = raw.min()
-    hi = raw.max()
+    lo, hi = raw.min(), raw.max()
     if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
         probs = np.clip(((raw - lo) / (hi - lo)).values, 0.0, 1.0)
     else:
@@ -169,10 +164,14 @@ def simulate_portfolio_losses(df: pd.DataFrame, nsim: int = 10000, seed: typing.
     n = len(probs)
     if n == 0:
         return np.array([])
-    U = rnd.rand(nsim, n)
-    defaults = (U < probs).astype(float)
-    losses = defaults * exposure
-    port_losses = losses.sum(axis=1)
+
+    port_losses = np.empty(nsim)
+    for start in range(0, nsim, batch_size):
+        end = min(start + batch_size, nsim)
+        U = rnd.rand(end - start, n)          # small chunk, not the whole nsim
+        defaults = (U < probs)
+        port_losses[start:end] = (defaults * exposure).sum(axis=1)
+        del U, defaults                        # free immediately
     return port_losses
 
 

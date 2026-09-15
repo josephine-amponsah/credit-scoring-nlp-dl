@@ -1,23 +1,11 @@
 import dash
-from dash import Dash, html, dcc, Input, Output, callback, State
-import plotly.express as px
-from dash import dash_table
-import pandas as pd
+from dash import html, dcc, Input, Output, callback
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
-import sys
-import json
-import numerize
-from numerize import numerize
-import os
-import requests
 
-from flask_caching import Cache
-sys.path.insert(0, '../modules')
+from services.api_client import get_periods, get_options, get_survival
 
 dash.register_page(__name__, path="/survival_analysis")
-
-API_BASE = os.environ.get('API_BASE', 'http://127.0.0.1:8050')
 
 layout = html.Div([
     dcc.Store(id='survival-store'),
@@ -71,9 +59,7 @@ layout = html.Div([
 )
 def load_periods(_store_data):
     try:
-        resp = requests.get(f"{API_BASE}/overview/periods", timeout=10)
-        resp.raise_for_status()
-        periods = resp.json().get('periods', [])
+        periods = get_periods().get('periods', [])
         options = [{'label': p, 'value': p} for p in periods]
         value = periods[-1] if periods else None
         return options, value
@@ -87,13 +73,8 @@ def load_periods(_store_data):
     Input('survival-period-filter', 'value')
 )
 def load_loan_purposes(period):
-    params = {}
-    if period:
-        params['period'] = period
     try:
-        resp = requests.get(f"{API_BASE}/overview/options", params=params, timeout=10)
-        resp.raise_for_status()
-        opts = resp.json().get('loan_purposes', [])
+        opts = get_options(period).get('loan_purposes', [])
         options = [{'label': o, 'value': o} for o in opts]
         values = [o['value'] for o in options]
         return options, values
@@ -113,16 +94,8 @@ def load_loan_purposes(period):
     prevent_initial_call=False
 )
 def update_survival(period, loan_purposes):
-    params = {}
-    if period:
-        params['period'] = period
-    if loan_purposes:
-        params['loan_purpose'] = ','.join(loan_purposes) if isinstance(loan_purposes, (list, tuple)) else str(loan_purposes)
-
     try:
-        resp = requests.get(f"{API_BASE}/survival", params=params, timeout=20)
-        resp.raise_for_status()
-        payload = resp.json()
+        payload = get_survival(period, loan_purposes)
         months = payload.get('months', [])
         surv = payload.get('survival', [])
         events = payload.get('events', [])

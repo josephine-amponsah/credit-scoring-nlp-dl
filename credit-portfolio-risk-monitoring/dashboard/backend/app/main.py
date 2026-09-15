@@ -3,8 +3,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-import torch, joblib, json, numpy as np, pandas as pd
-import shap, os
+import joblib, json, numpy as np, pandas as pd
+import os
 from fastapi.responses import HTMLResponse
 from pydantic.dataclasses import dataclass
 from fastapi import Query
@@ -43,7 +43,8 @@ def overview_summary(period: Optional[str] = None, loan_purpose: Optional[str] =
     - period: e.g. '2018Q4'
     - loan_purpose: comma-separated list of loan purpose values
     """
-    df = insights.load_data(period)
+    df = insights.load_data(period).copy()
+    # df = insights.load_data(period)
     if df is None or df.empty:
         return {'total_lent': 0.0, 'repaid': 0.0, 'default_rate': 0.0, 'interest_earned': 0.0}
     if loan_purpose:
@@ -61,7 +62,7 @@ def overview_aggregates(period: Optional[str] = None, loan_purpose: Optional[str
     """Return grouped aggregates by loan purpose.
     Returns JSON: { data: [ {loan_purpose, lent, repaid, interest}, ... ] }
     """
-    df = insights.load_data(period)
+    df = insights.load_data(period).copy()
     if df is None or df.empty:
         return {'data': []}
     if loan_purpose:
@@ -77,7 +78,7 @@ def overview_aggregates(period: Optional[str] = None, loan_purpose: Optional[str
 @app.get("/overview/options")
 def overview_options(period: Optional[str] = None):
     """Return available loan purpose options for the period (or latest when omitted)."""
-    df = insights.load_data(period)
+    df = insights.load_data(period).copy()
     if df is None or df.empty:
         return {'loan_purposes': []}
     opts = insights.loan_purposes(df)
@@ -88,7 +89,7 @@ def overview_options(period: Optional[str] = None):
 def overview_periods():
     """Return available period identifiers (e.g. '2018Q4')."""
     try:
-        periods = insights.list_periods()
+        periods = insights.list_periods().copy()
         return {'periods': periods}
     except Exception:
         return {'periods': []}
@@ -99,7 +100,7 @@ def overview_periods():
 def risk_expected_loss(period: Optional[str] = None):
     """Return total expected loss and simple breakdown for the requested period."""
     try:
-        df = insights.load_data(period)
+        df = insights.load_data(period).copy()
         if df is None or df.empty:
             return {'total_expected_loss': 0.0, 'n_loans': 0}
         total_el, per_loan = risk_metrics.expected_loss(df)
@@ -118,7 +119,7 @@ def risk_var(period: Optional[str] = None, confidence: Optional[float] = 0.95, n
     - nsim: number of Monte Carlo simulations
     """
     try:
-        df = insights.load_data(period)
+        df = insights.load_data(period).copy()
         if df is None or df.empty:
             return {'var': 0.0, 'hist': {'bins': [], 'counts': []}}
         losses = risk_metrics.simulate_portfolio_losses(df, nsim=int(nsim))
@@ -136,7 +137,7 @@ def risk_var(period: Optional[str] = None, confidence: Optional[float] = 0.95, n
 def survival(period: Optional[str] = None, loan_purpose: Optional[str] = None):
     """Return a simple Kaplan-Meier style survival curve for the cohort."""
     try:
-        df = insights.load_data(period)
+        df = insights.load_data(period).copy()
         if df is None or df.empty:
             return {'months': [], 'survival': [], 'events': [], 'at_risk': [], 'median_months': None, 'n_loans': 0}
         if loan_purpose:
