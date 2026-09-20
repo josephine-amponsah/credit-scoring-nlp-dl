@@ -5,7 +5,28 @@ from typing import Iterable, Optional
 
 import httpx
 
-API_BASE = os.getenv("API_BASE", os.getenv("API_BASE_URL", "http://127.0.0.1:8050")).rstrip("/")
+_DEFAULT_API_BASES = (
+    os.getenv("API_BASE") or os.getenv("API_BASE_URL") or "http://127.0.0.1:8000",
+    "http://127.0.0.1:8050",
+    "http://127.0.0.1:8000",
+)
+
+
+def _resolve_api_base():
+    for base in _DEFAULT_API_BASES:
+        base = base.rstrip("/")
+        if not base:
+            continue
+        try:
+            resp = httpx.get(f"{base}/overview/periods", timeout=2)
+            if resp.status_code < 500:
+                return base
+        except Exception:
+            continue
+    return _DEFAULT_API_BASES[0].rstrip("/")
+
+
+API_BASE = _resolve_api_base()
 
 
 def _to_csv(values):

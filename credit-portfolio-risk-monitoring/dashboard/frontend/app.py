@@ -44,14 +44,19 @@ server = app.server
 BACKEND_DATA_DIR = Path(__file__).resolve().parents[1] / 'backend' / 'app' / 'data'
 timeout = 20
 
-# Use simple in-memory cache by default to avoid filesystem backend import issues.
-# For production, switch to a persistent backend (Redis, Memcached) and update config.
-# Initialize Flask-Caching if available and configured correctly; fall back to
-# an in-process LRU cache if the backend is not importable on this system.
+# Flask-Caching 2.x uses backend class names such as `SimpleCache`, not the older
+# lowercase alias `simple` that resolves to `flask_caching.backends.simple`.
+# Keep the default in-memory cache but normalize common env values for compatibility.
 try:
-    cache = Cache(server, config={
-        'CACHE_TYPE': os.environ.get('CACHE_TYPE', 'simple')
-    })
+    cache_type = os.environ.get('CACHE_TYPE', 'SimpleCache').strip()
+    cache_alias_map = {
+        'simple': 'SimpleCache',
+        'simplecache': 'SimpleCache',
+        'null': 'NullCache',
+        'none': 'NullCache',
+    }
+    cache_type = cache_alias_map.get(cache_type.lower(), cache_type)
+    cache = Cache(server, config={'CACHE_TYPE': cache_type})
 except Exception as e:
     # avoid failing app startup due to missing cache backends
     print("[warning] flask-caching init failed, falling back to lru cache:", e, file=sys.stderr)
@@ -119,7 +124,7 @@ app.layout = html.Div([
                             ], id="overview-item", className="nav-item"),
                         html.Li(
                                 [
-                            html.A("NPV Analysis", id="risk-segments-link", className="nav-link", href=dash.page_registry['pages.risk_segments']['path'])
+                            html.A("Vintage Analysis", id="risk-segments-link", className="nav-link", href=dash.page_registry['pages.risk_segments']['path'])
                                 ], id="risk-segments-item", className = "nav-item"),
                         html.Li(
                                 [
