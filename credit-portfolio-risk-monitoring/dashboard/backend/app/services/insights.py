@@ -20,9 +20,12 @@ import functools
 from pathlib import Path
 from typing import Optional, List, Dict
 
-# Prefer the deployed backend data directory. This repository is structured so
-# the data is stored under dashboard/backend/app/data rather than a GitHub URL.
+# Prefer the local backend data directory. In this repo the parquet files live under
+# dashboard/backend/app/data. Keep a repo-level fallback for local testing and deployment.
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
+FALLBACK_DATA_DIR = Path(__file__).resolve().parents[3] / 'data'
+if not DEFAULT_DATA_DIR.exists() and FALLBACK_DATA_DIR.exists():
+	DEFAULT_DATA_DIR = FALLBACK_DATA_DIR
 DEFAULT_DATA_URL = str(DEFAULT_DATA_DIR)
 
 
@@ -68,10 +71,10 @@ def load_data(period=None, data_url=DEFAULT_DATA_URL, timeout=10) -> pd.DataFram
 	"""
 	try:
 		local_dirs = [
-			Path(data_url) if data_url and Path(data_url).exists() else None,
-			Path(__file__).resolve().parents[1] / 'data',
-			Path(__file__).resolve().parents[3] / 'notebooks' / 'data_splits',
-		]
+				Path(data_url) if data_url and Path(data_url).exists() else None,
+				DEFAULT_DATA_DIR,
+				FALLBACK_DATA_DIR,
+			]
 		for local_dir in local_dirs:
 			if local_dir is None or not local_dir.exists():
 				continue
@@ -221,16 +224,9 @@ def loan_purposes(df: pd.DataFrame) -> List[str]:
 
 
 def list_periods(data_url: str = DEFAULT_DATA_URL, timeout: int = 10) -> List[str]:
-	"""Return available quarter period identifiers (e.g. '2018Q4').
-
-	Prefers local copies under `notebooks/data_splits` when present, otherwise
-	lists files from the configured GitHub `data_url`.
-	"""
-	# Local first
 	try:
-		local_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'notebooks', 'data_splits')
-		local_dir = os.path.normpath(local_dir)
-		if os.path.isdir(local_dir):
+		local_dir = Path(data_url)
+		if local_dir.is_dir():
 			names = [n for n in os.listdir(local_dir) if n.startswith('data_')]
 			if names:
 				periods = sorted({n.split('data_')[1].split('.')[0] for n in names})
@@ -238,7 +234,6 @@ def list_periods(data_url: str = DEFAULT_DATA_URL, timeout: int = 10) -> List[st
 	except Exception:
 		pass
 
-	# Remote listing
 	try:
 		names = _list_remote_datafiles(data_url, timeout=timeout)
 		if not names:

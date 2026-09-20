@@ -107,7 +107,30 @@ def update_survival(period, loan_purposes):
             return '-', '-', '-', '-', fig
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=months, y=surv, mode='lines+markers', name='Survival', line=dict(color='#18BC9C', width=3)))
+        # plot stepwise Kaplan-Meier survival curve
+        fig.add_trace(go.Scatter(x=months, y=surv, mode='lines', name='Kaplan-Meier', line=dict(color='#18BC9C', width=3), hoverinfo='x+y', line_shape='hv'))
+        # add confidence interval shading if present
+        lower = payload.get('lower_ci')
+        upper = payload.get('upper_ci')
+        if lower and upper and len(lower) == len(months) and len(upper) == len(months):
+            # create filled area between upper and lower bounds
+            fig.add_trace(go.Scatter(
+                x=months + months[::-1],
+                y=upper + lower[::-1],
+                fill='toself',
+                fillcolor='rgba(24,188,156,0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                hoverinfo='skip',
+                showlegend=True,
+                name='95% CI'
+            ))
+        # overlay cohort-averaged Cox predicted survival curve if available
+        cox = payload.get('cox_survival')
+        if cox and isinstance(cox, dict):
+            cox_months = cox.get('months', [])
+            cox_surv = cox.get('survival', [])
+            if cox_months and cox_surv and len(cox_months) == len(cox_surv):
+                fig.add_trace(go.Scatter(x=cox_months, y=cox_surv, mode='lines', name='Cox (cohort mean)', line=dict(color='#F39C12', width=2, dash='dash')))
         fig.update_layout(
             xaxis_title='Months since origination',
             yaxis_title='Survival probability',

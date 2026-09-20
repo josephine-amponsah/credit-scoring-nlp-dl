@@ -14,8 +14,9 @@ from flask_caching import Cache
 sys.path.insert(0, '../modules')
 
 # app = Dash(__name__)
-dash.register_page(__name__, path = "/npv_backtesting")
+dash.register_page(__name__, path = "/vintage_analysis")
 layout = html.Div([
+    # html.H3('Vintage Analysis', className='mb-3'),
     dcc.Store(id = "sales-data"),
     dbc.Row([
         dbc.Col([

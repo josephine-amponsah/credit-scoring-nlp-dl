@@ -1,6 +1,7 @@
 pandas
 numpy
 matplotlib
+lifelines
 seaborn
 scikit-learn
 xgboost
